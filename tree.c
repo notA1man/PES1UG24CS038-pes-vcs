@@ -10,6 +10,7 @@
 //   "100644 hello.txt\0" followed by 32 raw bytes of SHA-256
 
 #include "tree.h"
+#include "index.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -162,12 +163,57 @@ static int build_tree_level(const ScopedEntry *scoped, int scoped_count, ObjectI
             continue;
         }
 
-        // TODO: Phase 4 - handle directory recursion
+        // Directory entry - extract directory name
+        size_t dlen = (size_t)(slash - s);
+        if (dlen == 0 || dlen >= 256) return -1;
+
+        char dirname[256];
+        memcpy(dirname, s, dlen);
+        dirname[dlen] = '\0';
+
+        // Skip if already seen this directory
+        int already = 0;
+        for (int k = 0; k < seen_count; k++) {
+            if (strcmp(seen_dirs[k], dirname) == 0) {
+                already = 1;
+                break;
+            }
+        }
+        if (already) continue;
+
+        // Track seen directory
+        snprintf(seen_dirs[seen_count++], sizeof(seen_dirs[0]), "%s", dirname);
+
+        // Collect child entries (files/dirs inside this directory)
+        ScopedEntry child[MAX_INDEX_ENTRIES];
+        int child_count = 0;
+
+        for (int j = 0; j < scoped_count; j++) {
+            const char *sj = scoped[j].suffix;
+            const char *sj_slash = strchr(sj, '/');
+            if (!sj_slash) continue;
+
+            size_t sj_dlen = (size_t)(sj_slash - sj);
+            if (sj_dlen == dlen && strncmp(sj, dirname, dlen) == 0) {
+                child[child_count].entry = scoped[j].entry;
+                child[child_count].suffix = sj_slash + 1;
+                child_count++;
+            }
+        }
+
+        // Recursively build subtree
+        ObjectID child_id;
+        if (build_tree_level(child, child_count, &child_id) != 0) return -1;
+
+        // Add directory entry to current tree
+        if (tree.count >= MAX_TREE_ENTRIES) return -1;
+        TreeEntry *te = &tree.entries[tree.count++];
+        te->mode = MODE_DIR;
+        te->hash = child_id;
+        snprintf(te->name, sizeof(te->name), "%s", dirname);
     }
 
     // TODO: Phase 5 - serialize and write tree
-    (void)seen_dirs;
-    (void)seen_count;
     (void)out_id;
     return -1;
 }
