@@ -130,6 +130,16 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         return 0;
     }
 
+    // create shard directory
+    char hex[HASH_HEX_SIZE + 1];
+    hash_to_hex(&hash, hex);
+    char shard_dir[512];
+    snprintf(shard_dir, sizeof(shard_dir), "%s/%.2s", OBJECTS_DIR, hex);
+    if (mkdir(shard_dir, 0755) != 0 && errno != EEXIST) {
+        free(full_obj);
+        return -1;
+    }
+
     free(full_obj);
     return -1;
 }
