@@ -224,5 +224,8 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     free(raw);
     if (rc != 0) return -1;
 
-    return -1;
+    if (head_update(&new_commit) != 0) return -1;
+
+    *commit_id_out = new_commit;
+    return 0;
 }
