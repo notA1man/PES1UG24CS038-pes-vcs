@@ -149,7 +149,19 @@ static int build_tree_level(const ScopedEntry *scoped, int scoped_count, ObjectI
     int seen_count = 0;
 
     for (int i = 0; i < scoped_count; i++) {
-        // TODO: Phase 3 - handle leaf files
+        const char *s = scoped[i].suffix;
+        const char *slash = strchr(s, '/');
+
+        if (!slash) {
+            // Leaf file at this level
+            if (tree.count >= MAX_TREE_ENTRIES) return -1;
+            TreeEntry *te = &tree.entries[tree.count++];
+            te->mode = scoped[i].entry->mode;
+            te->hash = scoped[i].entry->hash;
+            snprintf(te->name, sizeof(te->name), "%s", s);
+            continue;
+        }
+
         // TODO: Phase 4 - handle directory recursion
     }
 
