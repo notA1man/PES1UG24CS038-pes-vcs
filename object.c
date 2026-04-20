@@ -286,4 +286,25 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
         free(buf);
         return -1;
     }
+
+
+    size_t data_offset = header_len + 1;
+    //stored payload size in header must exactly match remaining file bytes.
+    if (data_offset + payload_size != (size_t)sz) {
+        free(buf);
+        return -1;
+    }
+
+    void *out = malloc(payload_size);
+    if (!out && payload_size > 0) {
+        free(buf);
+        return -1;
+    }
+
+    if (payload_size > 0) memcpy(out, buf + data_offset, payload_size);
+    *data_out = out;
+    *len_out = payload_size;
+
+    free(buf);
+    return 0;
 }
