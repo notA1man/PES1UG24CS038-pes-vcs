@@ -250,6 +250,40 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
 
     ObjectID check;
     compute_hash(buf, (size_t)sz, &check);
-    (void)id; (void)type_out; (void)data_out; (void)len_out;
-    return -1;
+
+    // Integrity check path hash must match recomputed object hash.
+    if (memcmp(check.hash, id->hash, HASH_SIZE) != 0) {
+        free(buf);
+        return -1;
+    }
+
+    uint8_t *nul = memchr(buf, '\0', (size_t)sz);
+    if (!nul) {
+        free(buf);
+        return -1;
+    }
+
+    size_t header_len = (size_t)(nul - buf);
+    char header[128];
+    if (header_len >= sizeof(header)) {
+        free(buf);
+        return -1;
+    }
+    memcpy(header, buf, header_len);
+    header[header_len] = '\0';
+
+    char type_str[16];
+    size_t payload_size;
+    if (sscanf(header, "%15s %zu", type_str, &payload_size) != 2) {
+        free(buf);
+        return -1;
+    }
+
+    if (strcmp(type_str, "blob") == 0) *type_out = OBJ_BLOB;
+    else if (strcmp(type_str, "tree") == 0) *type_out = OBJ_TREE;
+    else if (strcmp(type_str, "commit") == 0) *type_out = OBJ_COMMIT;
+    else {
+        free(buf);
+        return -1;
+    }
 }
