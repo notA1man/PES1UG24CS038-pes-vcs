@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 #include <openssl/evp.h>
 
 // ─── PROVIDED ────────────────────────────────────────────────────────────────
@@ -140,8 +141,50 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         return -1;
     }
 
+    // write to temporary file
+    char temp_path[512];
+    char final_path[512];
+    snprintf(temp_path, sizeof(temp_path), "%s/temp.XXXXXX", shard_dir);
+    object_path(&hash, final_path, sizeof(final_path));
+
+    int fd = mkstemp(temp_path);
+    if (fd < 0) {
+        free(full_obj);
+        return -1;
+    }
+
+    ssize_t written = write(fd, full_obj, full_len);
+    if (written < 0 || (size_t)written != full_len) {
+        close(fd);
+        unlink(temp_path);
+        free(full_obj);
+        return -1;
+    }
+
+    if (fsync(fd) != 0) {
+        close(fd);
+        unlink(temp_path);
+        free(full_obj);
+        return -1;
+    }
+    close(fd);
+
+    // atomic rename and directory fsync
+    if (rename(temp_path, final_path) != 0) {
+        unlink(temp_path);
+        free(full_obj);
+        return -1;
+    }
+
+    int dir_fd = open(shard_dir, O_RDONLY | O_DIRECTORY);
+    if (dir_fd >= 0) {
+        fsync(dir_fd);
+        close(dir_fd);
+    }
+
+    *id_out = hash;
     free(full_obj);
-    return -1;
+    return 0;
 }
 
 // Read an object from the store.
