@@ -213,14 +213,28 @@ static int build_tree_level(const ScopedEntry *scoped, int scoped_count, ObjectI
         snprintf(te->name, sizeof(te->name), "%s", dirname);
     }
 
-    // TODO: Phase 5 - serialize and write tree
-    (void)out_id;
-    return -1;
+    // Serialize and write tree object
+    void *raw = NULL;
+    size_t raw_len = 0;
+    if (tree_serialize(&tree, &raw, &raw_len) != 0) return -1;
+
+    int rc = object_write(OBJ_TREE, raw, raw_len, out_id);
+    free(raw);
+    return rc;
 }
 
 // Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
-    // TODO: Load index and start recursion
-    (void)id_out;
-    return -1;
+    if (!id_out) return -1;
+
+    Index idx;
+    if (index_load(&idx) != 0) return -1;
+
+    ScopedEntry scoped[MAX_INDEX_ENTRIES];
+    for (int i = 0; i < idx.count; i++) {
+        scoped[i].entry = &idx.entries[i];
+        scoped[i].suffix = idx.entries[i].path;
+    }
+
+    return build_tree_level(scoped, idx.count, id_out);
 }
