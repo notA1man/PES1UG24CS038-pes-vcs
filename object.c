@@ -104,7 +104,6 @@ static const char* type_to_str(ObjectType t) {
 //
 // Returns 0 on success, -1 on error.
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
-    // Phase 1: Build header and prepare full object buffer
     const char *type_str = type_to_str(type);
     size_t header_len = strlen(type_str) + 1 + 20 + 1; // type + space + size digits + null
     char *header = malloc(header_len);
@@ -122,10 +121,14 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     memcpy(full_obj + header_len, data, len);
     free(header);
 
-    // TODO: Phase 2 - Compute hash and deduplication check
-    // TODO: Phase 3 - Create shard directory
-    // TODO: Phase 4 - Write to temp file with fsync
-    // TODO: Phase 5 - Atomic rename and directory fsync
+    // deduplication check
+    ObjectID hash;
+    compute_hash(full_obj, full_len, &hash);
+    if (object_exists(&hash)) {
+        *id_out = hash;
+        free(full_obj);
+        return 0;
+    }
 
     free(full_obj);
     return -1;
