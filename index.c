@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <ctype.h>
 
 // Forward declaration (implemented in object.c)
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
@@ -113,8 +114,7 @@ int index_status(const Index *index) {
             
             if (!is_tracked) {
                 struct stat st;
-                stat(ent->d_name, &st);
-                if (S_ISREG(st.st_mode)) { // Only list regular files for simplicity
+                if (stat(ent->d_name, &st) == 0 && S_ISREG(st.st_mode)) { // Only list regular files for simplicity
                     printf("  untracked:  %s\n", ent->d_name);
                     untracked_count++;
                 }
@@ -181,6 +181,15 @@ int index_load(Index *index) {
         }
 
         index->entries[index->count++] = e;
+    }
+
+    // If there is additional non-whitespace content, the index exceeded capacity.
+    int ch;
+    while ((ch = fgetc(f)) != EOF) {
+        if (!isspace((unsigned char)ch)) {
+            fclose(f);
+            return -1;
+        }
     }
 
     fclose(f);
@@ -273,6 +282,7 @@ int index_add(Index *index, const char *path) {
     struct stat st;
     // Stage only regular files in this simplified lab implementation.
     if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) return -1;
+    if (st.st_size < 0 || (uint64_t)st.st_size > UINT32_MAX) return -1;
 
     FILE *f = fopen(path, "rb");
     if (!f) return -1;
@@ -312,7 +322,8 @@ int index_add(Index *index, const char *path) {
     entry->hash = blob_id;
     entry->mtime_sec = (uint64_t)st.st_mtime;
     entry->size = (uint32_t)st.st_size;
-    snprintf(entry->path, sizeof(entry->path), "%s", path);
+    int wrote = snprintf(entry->path, sizeof(entry->path), "%s", path);
+    if (wrote < 0 || (size_t)wrote >= sizeof(entry->path)) return -1;
 
     return index_save(index);
 }
