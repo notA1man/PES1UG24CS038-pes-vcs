@@ -91,11 +91,43 @@ int object_exists(const ObjectID *id) {
 //   - rename             : atomically moving the temp file to the final path
 //
 
+// Helper: Convert ObjectType to string
+static const char* type_to_str(ObjectType t) {
+    switch(t) {
+        case OBJ_BLOB: return "blob";
+        case OBJ_TREE: return "tree";
+        case OBJ_COMMIT: return "commit";
+        default: return "unknown";
+    }
+}
+
 //
 // Returns 0 on success, -1 on error.
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
-    // TODO: Implement
-    (void)type; (void)data; (void)len; (void)id_out;
+    // Phase 1: Build header and prepare full object buffer
+    const char *type_str = type_to_str(type);
+    size_t header_len = strlen(type_str) + 1 + 20 + 1; // type + space + size digits + null
+    char *header = malloc(header_len);
+    if (!header) return -1;
+    snprintf(header, header_len, "%s %zu", type_str, len);
+    header_len = strlen(header) + 1; // include the null terminator
+
+    size_t full_len = header_len + len;
+    char *full_obj = malloc(full_len);
+    if (!full_obj) {
+        free(header);
+        return -1;
+    }
+    memcpy(full_obj, header, header_len);
+    memcpy(full_obj + header_len, data, len);
+    free(header);
+
+    // TODO: Phase 2 - Compute hash and deduplication check
+    // TODO: Phase 3 - Create shard directory
+    // TODO: Phase 4 - Write to temp file with fsync
+    // TODO: Phase 5 - Atomic rename and directory fsync
+
+    free(full_obj);
     return -1;
 }
 
