@@ -140,9 +140,29 @@ static int starts_with_dir(const char *path, const char *dir_prefix) {
     return strncmp(path, dir_prefix, n) == 0;
 }
 
+// Recursive helper: build one tree level from scoped entries
+static int build_tree_level(const ScopedEntry *scoped, int scoped_count, ObjectID *out_id) {
+    Tree tree;
+    tree.count = 0;
+
+    char seen_dirs[MAX_TREE_ENTRIES][256];
+    int seen_count = 0;
+
+    for (int i = 0; i < scoped_count; i++) {
+        // TODO: Phase 3 - handle leaf files
+        // TODO: Phase 4 - handle directory recursion
+    }
+
+    // TODO: Phase 5 - serialize and write tree
+    (void)seen_dirs;
+    (void)seen_count;
+    (void)out_id;
+    return -1;
+}
+
 // Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
-    // TODO: Implement recursive tree building
+    // TODO: Load index and start recursion
     (void)id_out;
     return -1;
 }
