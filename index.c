@@ -271,11 +271,13 @@ int index_add(Index *index, const char *path) {
     if (!index || !path) return -1;
 
     struct stat st;
+    // Stage only regular files in this simplified lab implementation.
     if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) return -1;
 
     FILE *f = fopen(path, "rb");
     if (!f) return -1;
 
+    // Read file bytes so we can write them as a blob object.
     size_t file_size = (size_t)st.st_size;
     uint8_t *buf = NULL;
     if (file_size > 0) {
@@ -293,6 +295,7 @@ int index_add(Index *index, const char *path) {
     fclose(f);
 
     ObjectID blob_id;
+    // Content-addressed storage: staged content is identified by hash.
     int rc = object_write(OBJ_BLOB, buf, file_size, &blob_id);
     free(buf);
     if (rc != 0) return -1;
@@ -304,6 +307,7 @@ int index_add(Index *index, const char *path) {
         memset(entry, 0, sizeof(*entry));
     }
 
+    // Update tracked metadata for fast status checks and persistence.
     entry->mode = (st.st_mode & S_IXUSR) ? 0100755 : 0100644;
     entry->hash = blob_id;
     entry->mtime_sec = (uint64_t)st.st_mtime;
