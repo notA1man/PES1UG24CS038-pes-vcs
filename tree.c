@@ -128,10 +128,21 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
 //   - tree_serialize  : convert your populated Tree struct into a binary buffer
 //   - object_write    : save that binary buffer to the store as OBJ_TREE
 //
+// Helper: Pair index entry with its current path suffix during recursion
+typedef struct {
+    const IndexEntry *entry;
+    const char *suffix;
+} ScopedEntry;
+
+// Helper: Check if path starts with given directory prefix
+static int starts_with_dir(const char *path, const char *dir_prefix) {
+    size_t n = strlen(dir_prefix);
+    return strncmp(path, dir_prefix, n) == 0;
+}
+
 // Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
     // TODO: Implement recursive tree building
-    // (See Lab Appendix for logical steps)
     (void)id_out;
     return -1;
 }
