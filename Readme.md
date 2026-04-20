@@ -113,6 +113,52 @@ Recovery options:
 
 ### Garbage Collection and Space Reclamation
 
-**Q6.1:** _TBD_
+**Q6.1: Finding and deleting unreachable objects**
 
-**Q6.2:** _TBD_
+Use a classic mark-and-sweep approach.
+
+Mark phase:
+
+1. Read all branch tips from `.pes/refs/heads/*`.
+2. For each tip commit, traverse:
+   - commit object itself,
+   - its parent chain,
+   - each commit's root tree,
+   - all subtree and blob hashes recursively.
+3. Insert every visited object hash into a reachable set.
+
+Sweep phase:
+
+1. Walk `.pes/objects/` shard directories.
+2. Reconstruct each object hash from `XX/remaining...` path.
+3. If hash is not in reachable set, delete object file.
+4. Optionally remove empty shard directories.
+
+Efficient data structure:
+
+- Hash set keyed by 32-byte object hash (`ObjectID`) gives near O(1) insert/lookup.
+
+Scale estimate (100,000 commits, 50 branches):
+
+- In worst case, visit roughly all reachable commits once: ~100,000 commit objects.
+- Plus corresponding trees and blobs reachable from those commits.
+- Total visited objects is usually several multiples of commit count, commonly in hundreds of thousands to low millions depending on file churn and deduplication.
+
+**Q6.2: Why concurrent GC with commit is dangerous**
+
+Race example:
+
+1. Commit process writes new blob/tree objects.
+2. Before branch ref is updated to point to the new commit, GC runs mark phase from current refs.
+3. New objects are not yet reachable from any ref, so GC marks them unreachable.
+4. GC sweep deletes them.
+5. Commit process updates ref to new commit that references now-deleted objects.
+
+Result: repository corruption (dangling commit/tree/blob references).
+
+How real Git avoids this:
+
+- Uses conservative pruning windows (`gc.pruneExpire`) so very recent unreachable objects are retained.
+- Uses locking/coordination to avoid conflicting maintenance operations.
+- Considers additional reachability roots (e.g., reflogs) during retention.
+- Often repacks first, then prunes under safer conditions.
